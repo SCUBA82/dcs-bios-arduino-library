@@ -3,7 +3,14 @@
 
 #include "Arduino.h"
 #include "ExportStreamListener.h"
-#include <Servo.h>
+
+#ifdef DCSBIOS_ESP32
+	// Added to provide ESP32 Servo compatibility
+	#include <ESP32Servo.h>
+  #else	
+    #include <Servo.h>
+#endif
+
 
 namespace DcsBios {
 	class ServoOutput : public Int16Buffer {

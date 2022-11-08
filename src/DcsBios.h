@@ -116,6 +116,146 @@ do not come with their own build system, we are just putting everything into the
 	}
 #endif
 
+#ifdef DCSBIOS_DEFAULT_SERIAL2
+	namespace DcsBios {
+		ProtocolParser parser;
+		void setup() {
+			Serial2.begin(250000);
+		}
+		void loop() {
+			while (Serial2.available()) {
+				parser.processChar(Serial2.read());
+			}
+			PollingInput::pollInputs();
+			ExportStreamListener::loopAll();			
+		}
+		bool tryToSendDcsBiosMessage(const char* msg, const char* arg) {
+			Serial2.write(msg); Serial2.write(' '); Serial2.write(arg); Serial2.write('\n');
+			DcsBios::PollingInput::setMessageSentOrQueued();
+			return true;
+		}
+	}
+#endif
+
+#ifdef DCSBIOS_LAN
+	//Added to have LAN accessibility
+	//#include <WiFi.h>
+		
+	#ifdef DCSBIOS_ESP8266
+		//ESP8266
+	    #include <ESP8266WiFi.h>
+		#include "user_interface.h" // Added to avoid losing UDP Multicast Connection
+	#endif
+	#ifdef DCSBIOS_ESP32
+		//ESP32
+		#include <WiFi.h>
+	#endif
+	
+	//
+	#include <WiFiUdp.h>
+
+	
+	WiFiUDP udp;
+	//WiFiUDP udp_send;
+	IPAddress ipmulti(239,255,50,10);
+	IPAddress remote_IP;
+	unsigned int port=5010;
+	unsigned int dcs_port=7778;
+
+	uint8_t dataUdP[128];
+	/*
+	 * LAN Configuration
+	*/
+	const char* ssid     = LAN_SSID;
+	const char* password = LAN_PASS;
+	  
+	// Static IP address
+	// IPAddress local_IP(192, 168, 1, 200);
+	// Gateway IP address
+	//IPAddress gateway(192, 168, 1, 1);
+	
+	//IPAddress subnet(255, 255, 0, 0);
+
+
+	namespace DcsBios {
+		
+		//unsigned int trans = 0;
+		ProtocolParser parser;
+		
+		void setup() {	
+			
+		  // Init LAN
+		  #if SERIAL_LOG
+			Serial.begin(115200);
+		  #endif
+		  WiFi.mode(WIFI_STA);
+		  //WiFi.config(local_IP, gateway, subnet);
+		  #ifdef DCSBIOS_ESP8266
+			wifi_set_sleep_type(NONE_SLEEP_T); //LIGHT_SLEEP_T and MODE_SLEEP_T
+		  #endif
+		  
+		  WiFi.begin(ssid, password);
+		  Serial.print("\n");
+		  while (WiFi.status() != WL_CONNECTED){
+			#if SERIAL_LOG  					
+				Serial.print(".");
+			#endif
+			delay(500);
+		  }
+		  #if SERIAL_LOG
+			Serial.print("\nLAN OK - IP:");
+			Serial.println(WiFi.localIP());
+		  #endif
+		  // multicast listener
+		  
+		  #ifdef DCSBIOS_ESP8266
+			udp.beginMulticast(WiFi.localIP(),ipmulti,port);
+		  #endif
+		  
+		  #ifdef DCSBIOS_ESP32
+			udp.beginMulticast(ipmulti,port);
+		  #endif
+		  
+		}
+		void loop() {
+		  // Read Package if available
+		 
+		  if(udp.parsePacket()) {
+			remote_IP = udp.remoteIP(); // Gets the Remote IP			
+			
+			while (udp.available()) {
+			   parser.processChar(udp.read());
+			}
+		  }  
+		  PollingInput::pollInputs();
+		  ExportStreamListener::loopAll();     
+		  
+		}
+		bool tryToSendDcsBiosMessage(const char* msg, const char* arg) {
+		  
+		  uint8_t pos = 1;
+		  char car = msg[0];
+		  while (car!=0x00){
+			udp.write(car);
+			car = msg[pos];
+			pos++;
+		  }
+		  udp.write(' ');
+		  car = arg[0];
+		  while (car!=0x00){
+			udp.write(car);
+			car = arg[pos];
+			pos++;
+		  }
+		  udp.write('\n');
+		  // Serial.write(msg); Serial.write(' '); Serial.write(arg); Serial.write('\n');
+		  DcsBios::PollingInput::setMessageSentOrQueued();
+		  return true;
+		}
+	  }
+#endif	
+
+
 #include "internal/Buttons.h"
 #include "internal/Switches.h"
 #include "internal/SyncingSwitches.h"

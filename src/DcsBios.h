@@ -140,6 +140,12 @@ do not come with their own build system, we are just putting everything into the
 #ifdef DCSBIOS_LAN
 	//Added to have LAN accessibility
 	//#include <WiFi.h>
+	//
+	// Defines:
+	//  #define DCSBIOS_LAN to have Wifi access	and then chose
+	//
+	//		#define DCSBIOS_ESP8266  - for using ESP8266
+	//		#define DCSBIOS_ESP32    - for using ESP32
 		
 	#ifdef DCSBIOS_ESP8266
 		//ESP8266
@@ -190,12 +196,13 @@ do not come with their own build system, we are just putting everything into the
 		  #endif
 		  WiFi.mode(WIFI_STA);
 		  //WiFi.config(local_IP, gateway, subnet);
+		  
 		  #ifdef DCSBIOS_ESP8266
 			wifi_set_sleep_type(NONE_SLEEP_T); //LIGHT_SLEEP_T and MODE_SLEEP_T
 		  #endif
 		  
 		  WiFi.begin(ssid, password);
-		  Serial.print("\n");
+		  
 		  while (WiFi.status() != WL_CONNECTED){
 			#if SERIAL_LOG  					
 				Serial.print(".");
@@ -235,6 +242,9 @@ do not come with their own build system, we are just putting everything into the
 		  
 		  uint8_t pos = 1;
 		  char car = msg[0];
+		  
+		  udp.beginPacket(udp.remoteIP(),dcs_port);
+		  
 		  while (car!=0x00){
 			udp.write(car);
 			car = msg[pos];
@@ -249,9 +259,42 @@ do not come with their own build system, we are just putting everything into the
 		  }
 		  udp.write('\n');
 		  // Serial.write(msg); Serial.write(' '); Serial.write(arg); Serial.write('\n');
+		  
+		  udp.endPacket();
+		  
 		  DcsBios::PollingInput::setMessageSentOrQueued();
 		  return true;
 		}
+		
+		bool tryToSendDcsBiosMessage(const char* msg) {
+		  
+		  uint8_t pos = 1;
+		  char car = msg[0];
+		  
+		  udp.beginPacket(udp.remoteIP(),dcs_port);
+		  		  
+		  while (car!=0x00){
+			udp.write(car);
+			car = msg[pos];
+			pos++;
+			if (car=='\n') { // There are two commands in the same line
+			  udp.write('\n');
+			  udp.endPacket(); // Send 1st part of the message
+			  delay(200);
+			  udp.beginPacket(udp.remoteIP(),dcs_port); // Second part
+			}
+		  }
+		  
+		  udp.write('\n');
+		  // Serial.write(msg); Serial.write(' '); Serial.write(arg); Serial.write('\n');
+		  
+		  udp.endPacket();
+		  
+		  DcsBios::PollingInput::setMessageSentOrQueued();
+		  return true;
+		}
+		
+		
 	  }
 #endif	
 

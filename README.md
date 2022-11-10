@@ -4,7 +4,8 @@ This is an Arduino library that makes it easy to write sketches that talk to DCS
 
 For more information and documentation, see the [DCS-BIOS FlightPanels Project](https://github.com/DCSFlightpanels).  The example "OneOfEverything" is a good place to start looking for controls to use.
 
-This fork adds WiFi-LAN capabilities based on ESP microcontrollers.
+This fork adds WiFi-LAN capabilities based on ESP32 microcontrollers.
+> In case of using the ESP32 microcontroller it is required to install de ESP32Servo library to let use the Servos.
 
 ## Origins
 

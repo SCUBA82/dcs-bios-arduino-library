@@ -277,7 +277,7 @@ do not come with their own build system, we are just putting everything into the
 			udp.write(car);
 			car = msg[pos];
 			pos++;
-			if (car=='\n') { // There are two commands in the same line
+			if (car=='\n') { // There are several commands - \n is the command separator
 			  udp.write('\n');
 			  udp.endPacket(); // Send 1st part of the message
 			  delay(200);

@@ -172,8 +172,7 @@ do not come with their own build system, we are just putting everything into the
 	/*
 	 * LAN Configuration
 	*/
-	const char* ssid     = LAN_SSID;
-	const char* password = LAN_PASS;
+	
 	  
 	// Static IP address
 	// IPAddress local_IP(192, 168, 1, 200);
@@ -188,7 +187,7 @@ do not come with their own build system, we are just putting everything into the
 		//unsigned int trans = 0;
 		ProtocolParser parser;
 		
-		void setup() {	
+		void setup(char *ssid, char *password) {	
 			
 		  // Init LAN
 		  #if SERIAL_LOG

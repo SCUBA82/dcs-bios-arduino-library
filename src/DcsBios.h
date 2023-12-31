@@ -14,8 +14,6 @@
 #include "internal/ExportStreamListener.h"
 #include "internal/PollingInput.h"
 #include "internal/Protocol.h"
-#include "internal/Addresses.h"
-
 
 #ifndef USART0_RX_vect
 #define USART0_RX_vect USART_RX_vect
@@ -26,6 +24,8 @@
 #ifndef PRR0
 #define PRR0 PRR
 #endif
+
+#define CONNECTION_TIMEOUT 10
 
 namespace DcsBios {
 	const unsigned char PIN_NC = 0xFF;
@@ -203,12 +203,17 @@ do not come with their own build system, we are just putting everything into the
 		  #endif
 		  
 		  WiFi.begin(ssid, password);
-		  
+		  unsigned long timeout_counter;
 		  while (WiFi.status() != WL_CONNECTED){
 			#if SERIAL_LOG  					
 				Serial.print(".");
 			#endif
 			delay(500);
+			timeout_counter++;
+			if(timeout_counter >= CONNECTION_TIMEOUT*2){
+				Serial.println("restarting");
+				//ESP.restart();
+			}
 		  }
 		  #if SERIAL_LOG
 			Serial.print("\nLAN OK - IP:");
@@ -307,16 +312,13 @@ do not come with their own build system, we are just putting everything into the
 #include "internal/Potentiometers.h"
 #include "internal/RotarySyncingPotentiometer.h"
 #include "internal/Leds.h"
-#ifndef DCSBIOS_DISABLE_SERVO
+#include "internal/FastLeds.h"
 #include "internal/Servos.h"
-#endif
 #include "internal/Dimmer.h"
 #include "internal/BcdWheels.h"
 #include "internal/AnalogMultiPos.h"
 #include "internal/RotarySwitch.h"
-#if defined(USE_MATRIX_SWITCHES) || defined(DCSBIOS_USE_MATRIX_SWITCHES)
 #include "internal/MatrixSwitches.h"
-#endif
 #include "internal/DualModeButton.h"
 
 namespace DcsBios {

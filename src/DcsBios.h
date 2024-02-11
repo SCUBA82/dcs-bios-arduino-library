@@ -257,6 +257,7 @@ do not come with their own build system, we are just putting everything into the
 			pos++;
 		  }
 		  udp.write(' ');
+		  pos = 1;
 		  car = arg[0];
 		  while (car!=0x00){
 			udp.write(car);

@@ -14,7 +14,8 @@
 #include "internal/ExportStreamListener.h"
 #include "internal/PollingInput.h"
 #include "internal/Protocol.h"
-
+#include "internal/Protocol.cpp.inc" // Needs to be a .cpp.inc to allow DCSBIOS_INCOMING_DATA_BUFFER_SIZE
+#include "internal/Addresses.h"
 #ifndef USART0_RX_vect
 #define USART0_RX_vect USART_RX_vect
 #define USART0_TX_vect USART_TX_vect
@@ -44,8 +45,17 @@ do not come with their own build system, we are just putting everything into the
 	#include "internal/DcsBiosNgRS485Master.cpp.inc"
 #endif
 #ifdef DCSBIOS_RS485_SLAVE
-	#include "internal/DcsBiosNgRS485Slave.h"
-	#include "internal/DcsBiosNgRS485Slave.cpp.inc"
+	#if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+		#include "internal/UART.Mod/DcsBiosNgRS485Slave.h"
+		#include "internal/UART.Mod/DcsBiosNgRS485Slave.cpp.inc"
+	#else
+		#include "internal/DcsBiosNgRS485Slave.h"
+		#include "internal/DcsBiosNgRS485Slave.cpp.inc"
+	#endif
+#endif
+#ifdef DCSBIOS_ESP32_WIFI
+	#include "internal/ESP32WiFi/DcsBiosESP32WiFiSlave.h"
+	#include "internal/ESP32WiFi/DcsBiosESP32WiFiSlave.cpp.inc"
 #endif
 #ifdef DCSBIOS_IRQ_SERIAL
 
@@ -313,13 +323,16 @@ do not come with their own build system, we are just putting everything into the
 #include "internal/Potentiometers.h"
 #include "internal/RotarySyncingPotentiometer.h"
 #include "internal/Leds.h"
-#include "internal/FastLeds.h"
+#ifndef DCSBIOS_DISABLE_SERVO
 #include "internal/Servos.h"
+#endif
 #include "internal/Dimmer.h"
 #include "internal/BcdWheels.h"
 #include "internal/AnalogMultiPos.h"
 #include "internal/RotarySwitch.h"
+#if defined(USE_MATRIX_SWITCHES) || defined(DCSBIOS_USE_MATRIX_SWITCHES)
 #include "internal/MatrixSwitches.h"
+endif
 #include "internal/DualModeButton.h"
 
 namespace DcsBios {

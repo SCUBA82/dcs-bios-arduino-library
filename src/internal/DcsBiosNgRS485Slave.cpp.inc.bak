@@ -1,9 +1,14 @@
 #ifdef DCSBIOS_RS485_SLAVE
 
 namespace DcsBios {
-
+#ifdef DCSBIOS_FOR_STM32
+	RS485Slave::RS485Slave(usart_dev *usart, uint32_t txen_pin) :
+	udr(&usart->regs->DR), usart_sr(&usart->regs->SR), usart_cr1(&usart->regs->CR1), usart_cr2(&usart->regs->CR2), usart_cr3(&usart->regs->CR3), usart_brr(&usart->regs->BRR)
+#else
 	RS485Slave::RS485Slave(volatile uint8_t *udr, volatile uint8_t *ucsra, volatile uint8_t *ucsrb, volatile uint8_t *ucsrc, uint8_t txen_pin) :
-	udr(udr), ucsra(ucsra), ucsrb(ucsrb), ucsrc(ucsrc) {
+	udr(udr), ucsra(ucsra), ucsrb(ucsrb), ucsrc(ucsrc)
+#endif
+	{
 		txen_port = portOutputRegister(digitalPinToPort(txen_pin));
 		txen_pin_mask = digitalPinToBitMask(txen_pin);
 		state = UNINITIALIZED;
@@ -172,82 +177,69 @@ namespace DcsBios {
 		
 	}
 
-	// Arduino Mega UART 1 or Arduino ProMicro
-	#if defined(UART1_SELECT) || defined(__AVR_ATmega32U4__)
-		RS485Slave rs485slave(&UDR1, &UCSR1A, &UCSR1B, &UCSR1C, TXENABLE_PIN);	
-		ISR(USART1_RX_vect) { rs485slave.rxISR(); }
-		ISR(USART1_TX_vect) { rs485slave.txcISR(); }
-		ISR(USART1_UDRE_vect) { rs485slave.udreISR(); }
-	#else 
-		// Arduino Mega UART 2
-		#ifdef UART2_SELECT
-			RS485Slave rs485slave(&UDR2, &UCSR2A, &UCSR2B, &UCSR2C, TXENABLE_PIN);	
-			ISR(USART2_RX_vect) { rs485slave.rxISR(); }
-			ISR(USART2_TX_vect) { rs485slave.txcISR(); }
-			ISR(USART2_UDRE_vect) { rs485slave.udreISR(); }
-		#else
-			// Arduino Mega UART 3
-			#ifdef UART3_SELECT
-				RS485Slave rs485slave(&UDR3, &UCSR3A, &UCSR3B, &UCSR3C, TXENABLE_PIN);	
-				ISR(USART3_RX_vect) { rs485slave.rxISR(); }
-				ISR(USART3_TX_vect) { rs485slave.txcISR(); }
-				ISR(USART3_UDRE_vect) { rs485slave.udreISR(); }
-			#else
-				// Arduino UART 0 - Default
-				RS485Slave rs485slave(&UDR0, &UCSR0A, &UCSR0B, &UCSR0C, TXENABLE_PIN);	
-				ISR(USART0_RX_vect) { rs485slave.rxISR(); }
-				ISR(USART0_TX_vect) { rs485slave.txcISR(); }
-				ISR(USART0_UDRE_vect) { rs485slave.udreISR(); }
-			#endif
-		#endif
-	#endif
-
-	void setup() {
-
-		// Arduino Mega UART 1 or Arduino ProMicro
-		#if defined(UART1_SELECT) || defined(__AVR_ATmega32U4__)
-			PRR1 &= ~(0<<PRUSART1); // PRR1 Bit 0 - PRUSART1: Power Reduction USART1
-			UBRR1H = 0;
-			UBRR1L = 3; // 250000 bps
-			UCSR1A = 0;
-			UCSR1C = (1<<UCSZ10) | (1<<UCSZ11);
-		#else 
-			// Arduino Mega UART 2
-			#ifdef UART2_SELECT
-				PRR1 &= ~(1<<PRUSART2); // PRR1 Bit 1 - PRUSART2: Power Reduction USART2
-				UBRR2H = 0;
-				UBRR2L = 3; // 250000 bps
-				UCSR2A = 0;
-				UCSR2C = (1<<UCSZ20) | (1<<UCSZ21);
-			#else 
-				// Arduino Mega UART 3
-				#ifdef UART3_SELECT
-					PRR1 &= ~(2<<PRUSART3); // PRR1 Bit 2 - PRUSART3: Power Reduction USART3
-					UBRR3H = 0;
-					UBRR3L = 3; // 250000 bps
-					UCSR3A = 0;
-					UCSR3C = (1<<UCSZ30) | (1<<UCSZ31);
-				#else
-					// Arduino UART 0 - Default
-					PRR0 &= ~(1<<PRUSART0); // PRR0 Bit 1 - PRUSART0: Power Reduction USART0
-					UBRR0H = 0;
-					UBRR0L = 3; // 250000 bps
-					UCSR0A = 0;
-					UCSR0C = (1<<UCSZ00) | (1<<UCSZ01);
-					//UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0) | (1<<TXCIE0);
-				#endif
-			#endif
-		#endif
-
-		pinMode(TXENABLE_PIN, OUTPUT);
-		rs485slave.clear_txen();
-		
+	#ifdef DCSBIOS_FOR_STM32
+	void RS485Slave::UsartIRQ()	{
+		if((*usart_sr & (1<<USART_SR_TXE_BIT)) && udrie_set)
+		{
+			udreISR();
+		}
+		if((*usart_sr & (1<<USART_SR_TC_BIT)) && tx_enabled)
+		{
+			txcISR();
+		}
+		if((*usart_sr & ((1<<USART_SR_RXNE_BIT) | (1<<USART_SR_ORE_BIT))) && rx_enabled)
+		{
+			rxISR();
+		}
 	}
+	
+	RS485Slave rs485slave(USART1, TXENABLE_PIN);
+	
+	extern "C" void  __irq_usart1()	{
+		rs485slave.UsartIRQ();
+	}
+	
+	void setup() {
+		RCC_BASE->APB2ENR |= (1<<RCC_APB2ENR_USART1EN_BIT);
+		*rs485slave.usart_cr1 = (1<<USART_CR1_UE_BIT); // Set "USART enable" bit
+		//*rs485slave.usart_brr = 144; //Baud = fck/BRR = 36MHz / 144 = 250000bps
+		//*rs485slave.usart_brr = 192; //Baud = fck/BRR = 48MHz / 144 = 250000bps
+		*rs485slave.usart_brr = 288; //Baud = fck/BRR = 72MHz / 288 = 250000bps
+		//*rs485slave.usart_brr = 336;  //Baud = fck/BRR = 84MHz / 336 = 250000bps
+		pinMode(TXENABLE_PIN, OUTPUT);
+#if 1 // F103
+		gpio_set_mode(GPIOA, 9, GPIO_AF_OUTPUT_PP);
+		gpio_set_mode(GPIOA, 10, GPIO_INPUT_FLOATING);
+#else  // F407
+		gpio_set_mode(PB6, GPIO_AF_OUTPUT_PP);
+		gpio_set_mode(PB7, GPIO_AF_OUTPUT_PP);
+		gpio_set_af_mode(PB6, 7);
+		gpio_set_af_mode(PB7, 7);
+#endif
+		nvic_irq_enable(NVIC_USART1);
+		rs485slave.clear_txen();
+	}
+#else	
+	RS485Slave rs485slave(&UDR0, &UCSR0A, &UCSR0B, &UCSR0C, TXENABLE_PIN);	
+	ISR(USART0_RX_vect) { rs485slave.rxISR(); }
+	ISR(USART0_TX_vect) { rs485slave.txcISR(); }
+	ISR(USART0_UDRE_vect) { rs485slave.udreISR(); }
+	
+	void setup() {
+		PRR0 &= ~(1<<PRUSART0);
+		UBRR0H = 0;
+		UBRR0L = 3; // 250000 bps
+		UCSR0A = 0;
+		UCSR0C = (1<<UCSZ00) | (1<<UCSZ01);
+		pinMode(TXENABLE_PIN, OUTPUT);
+		//UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0) | (1<<TXCIE0);
+		rs485slave.clear_txen();
+	}
+#endif
 	
 	void loop() {
 		PollingInput::pollInputs();
 		ExportStreamListener::loopAll();
 	}
-
 }
 #endif

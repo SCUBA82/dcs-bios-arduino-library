@@ -199,7 +199,7 @@ do not come with their own build system, we are just putting everything into the
 		//unsigned int trans = 0;
 		ProtocolParser parser;
 		
-		void setup(char *ssid, char *password) {	
+		void setup(const char *ssid, const char *password) {	
 			
 		  // Init LAN
 		  #if SERIAL_LOG
